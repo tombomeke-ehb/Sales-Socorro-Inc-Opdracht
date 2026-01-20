@@ -1,0 +1,267 @@
+Strategisch Analyserapport: Datagedreven Transformatie van Retail Operations en Assortimentsoptimalisatie
+Datum: 20 oktober 2025
+Auteur: Hoofd Data Strategie & Business Intelligence
+Vertrouwelijkheidsniveau: Intern Gebruik / Academische Review
+Betreft: Integrale analyse van transactionele data (2016-2021) ter optimalisatie van productportfolio, winkelefficiëntie en klantbetrokkenheid.
+1. Managementsamenvatting en Strategische Imperatieven
+In een retailomgeving die steeds volatieler wordt door digitalisering en veranderend consumentengedrag, is het niet langer toereikend om te sturen op geaggregeerde omzetcijfers. Dit rapport presenteert de bevindingen van een diepgaand onderzoek naar de operationele data van de organisatie, waarbij gebruik is gemaakt van een integrale dataset bestaande uit verkooptransacties (Sales.csv), productstamgegevens (Products.csv), winkelinformatie (Stores.csv), klantprofielen (Customers.csv) en macro-economische indicatoren (Exchange_Rates.csv). De analyse is uitgevoerd om de methodologische validiteit van huidige strategieën te toetsen en nieuwe groeipaden te identificeren.
+De kern van dit onderzoek onthult een fundamentele dichotomie in de prestaties van de organisatie. Enerzijds is er een robuuste omzetstroom uit gevestigde categorieën zoals consumentenelektronica en witgoed, gedreven door een loyale, maar vergrijzende klantbasis. Anderzijds toont de data significante inefficiënties in het beheer van de fysieke winkelvoorraad en een zorgwekkend gebrek aan penetratie in jongere demografische segmenten. De analyse wijst uit dat de winkels met de grootste oppervlakte, met name in regio's zoals Newfoundland (Canada), een disproportioneel lage verkoopdichtheid per vierkante meter genereren in vergelijking met compactere stadswinkels in Australië.
+Op productniveau is vastgesteld dat de marge-mix scheefgroeit. Hoewel high-ticket items zoals Home Theater-systemen van merken als Fabrikam en Litware de bruto-omzet drijven, zijn het de 'onzichtbare' helden—de accessoires en kabels met marges tot boven de 50%—die de nettowinstgevendheid op peil houden. Tevens is er een patroon van negatieve transactievolumes (retouren) geïdentificeerd dat specifieke subcategorieën plaagt, wat duidt op een mismatch tussen productbelofte en klantervaring.
+De strategische aanbevelingen in dit rapport zijn opgebouwd rondom drie pijlers: (1) Assortimentsrationalisatie, waarbij de focus verschuift van volume naar marge-optimalisatie door het accessoire-aanbod strategisch te koppelen aan hoofdproducten; (2) Activa-herstructurering, waarbij de fysieke winkelportefeuille kritisch wordt geëvalueerd op basis van sales density-metrics, met mogelijke afstoting of verkleining van inefficiënte locaties; en (3) Demografische Verjonging, een marketingoffensief gericht op Gen-Z en Millennials, ondersteund door data-gedreven personalisatie.
+2. Inleiding en Methodologisch Kader
+De overgang naar een datagedreven organisatie vereist meer dan alleen het verzamelen van cijfers; het vereist een rigoureus methodologisch kader om ruwe data te transformeren tot betrouwbare beleidsinformatie. In dit hoofdstuk uiteenzetten wij de structuur van het onderzoek, de herkomst van de data, en—cruciaal voor de academische en strategische validatie—de onderbouwing van de gemaakte keuzes in data-preparatie en visualisatie.
+2.1 Context en Probleemstelling
+De organisatie opereert in een competitief landschap waarin e-commerce reuzen de prijzen drukken en fysieke winkels worstelen met relevantie. De initiële analyse (aangeleverd als PDF) bood inzicht in algemene trends zoals seizoensgebondenheid en top-level categorieprestaties. Echter, deze analyse miste de granulariteit die nodig is om operationele inefficiënties op winkelniveau of specifieke productmarges te begrijpen. De vraagstelling voor dit rapport luidt daarom: Hoe kunnen granulaire transactiedata, gecombineerd met klant- en winkelinformatie, leiden tot een optimalisatie van de operationele marge en een verhoging van de klantwaarde?
+2.2 Databronnen en Data Architectuur
+De analyse is gebaseerd op een klassiek Star Schema datamodel, een standaard in Business Intelligence die efficiënte analyse mogelijk maakt.1
+Feitentabel (Fact Table): De kern wordt gevormd door Sales.csv. Dit bestand bevat de transactionele waarheid: elke regel vertegenwoordigt een verkoopregel of retour. Variabelen zoals Order Number, Order Date, en Quantity zijn hierin leidend.
+Dimensietabellen (Dimensions):
+Products.csv: Bevat rijke metadata over de verkochte goederen, inclusief Unit Cost USD, Unit Price USD, Brand, en hiërarchische categorieën. Deze tabel is essentieel om de kale verkoopcijfers te vertalen naar winstgevendheid.
+Stores.csv: Biedt de fysieke context met attributen zoals Square Meters en Open Date. Dit stelt ons in staat om de prestaties te normaliseren naar winkelgrootte en leeftijd.
+Customers.csv: Voegt de menselijke factor toe met demografische gegevens (Birthday, Gender) en geografische locaties.
+Exchange_Rates.csv: Een cruciale tabel voor een multinationale onderneming, waarmee lokale valuta (AUD, CAD, EUR, GBP) genormaliseerd kunnen worden naar een basisvaluta (USD) om appels met appels te kunnen vergelijken.
+2.3 Methodologische Verantwoording van Data Transformatie (ETL)
+Een veelvoorkomende valkuil in retailanalyses is het blind vertrouwen op ruwe data. Voor dit rapport zijn specifieke methodologische interventies gepleegd om de integriteit van de conclusies te waarborgen.
+2.3.1 Behandeling van Valuta en Wisselkoersen
+De verkoopdata (Sales.csv) bevat transacties in vijf verschillende valuta. Het simpelweg optellen van deze bedragen zou leiden tot volstrekt onbruikbare totalen. De keuze is gemaakt om alle financiële waarden te converteren naar US Dollars (USD).
+Onderbouwing: USD fungeert als de wereldwijde standaard voor financiële rapportage in deze sector. De conversie maakt directe vergelijking mogelijk tussen een verkoop in Australië en een verkoop in Duitsland.
+Technische Uitvoering: De dataset Exchange_Rates.csv bevat dagkoersen. Echter, beurzen zijn in het weekend gesloten, wat leidt tot ontbrekende waarden op zaterdagen en zondagen—dagen waarop retailwinkels juist pieken. Het weglaten van weekendtransacties zou de analyse fataal vertekenen. Daarom is gekozen voor een 'Forward Fill' (ffill) methode, waarbij de wisselkoers van vrijdag wordt doorgetrokken naar het weekend.2 Dit is een geaccepteerde methodiek in financiële modellering die conservatief is en dataverlies voorkomt.
+2.3.2 Correctie voor Retouren (Negatieve Waarden)
+De Quantity kolom in Sales.csv bevat negatieve getallen (bijv. -1, -5).
+Interpretatie: In de context van transactionele retaildata duiden negatieve hoeveelheden vrijwel altijd op retouren of administratieve correcties.
+Methodologische Keuze: In plaats van deze regels te verwijderen als "datafouten" (data cleaning), zijn ze expliciet behouden. Het negeren van retouren zou leiden tot een kunstmatige inflatie van de omzet. Voor de bruto-omzetanalyse zijn ze afgetrokken van de totalen. Daarnaast zijn ze apart geanalyseerd om inzicht te krijgen in productkwaliteit: een product met hoge verkoop maar evenredig hoge retouren is een kostenpost, geen winstmaker.
+2.3.3 Dataverrijking via Merges
+Om diepgaande vragen te beantwoorden ("Kopen oudere klanten duurdere producten?"), is de verkoopdata verrijkt door middel van Left Joins met de dimensietabellen.
+Onderbouwing: Een Left Join op de Sales tabel garandeert dat we geen enkele transactie verliezen, zelfs niet als klantdata onvolledig zou zijn. Dit behoudt de financiële integriteit van de totalen. De keuze voor kolommen als Square Meters uit Stores.csv is specifiek gemaakt om de KPI Sales Density te kunnen berekenen, wat een nauwkeuriger beeld geeft van efficiëntie dan absolute omzet.
+2.4 Keuze van Visualisatietechnieken
+De grafische representaties in dit rapport en het bijgeleverde script zijn niet willekeurig gekozen, maar volgen de principes van effectieve datavisualisatie.3
+Line Charts: Gebruikt voor tijdreeksanalyses (omzet per maand) omdat ze de continuïteit van tijd en trends (zoals de Q4 piek) het best weergeven.
+Scatter Plots: Inzet voor de analyse van prijselasticiteit (Prijs vs. Volume). Dit type grafiek is superieur in het tonen van de spreiding en outliers, wat cruciaal is bij het identificeren van zowel "massa-producten" als "exclusieve niche-producten".
+Heatmaps: Toegepast voor geografische en correlatie-analyses. Ze bieden een direct visueel overzicht van 'hotspots' (bijv. hoge omzetconcentraties) zonder de lezer te overspoelen met tabellen.
+Bar Charts: Gebruikt voor categorische vergelijkingen (bijv. Merk A vs. Merk B), omdat ze het makkelijk maken om de relatieve grootte van discrete groepen te vergelijken.
+3. Diepte-analyse Productportfolio: Marge versus Volume
+Een analyse van het productbestand (Products.csv) in relatie tot de verkoopvolumes biedt een onthullend beeld van de werkelijke winstmotoren van de onderneming. Waar traditionele analyses vaak stoppen bij de "Top 10 Verkochte Producten", duiken wij dieper in de relatie tussen kostprijs, verkoopprijs en volume.
+3.1 De Economie van Merken: Contoso als Ruggengraat
+De dataset toont een sterke afhankelijkheid van het huismerk (of hoofdmerk) Contoso. Dit merk domineert niet alleen in aantal SKU's maar ook in volume.
+Volume Strategie: Producten zoals de Contoso 512MB MP3 Player E51 Silver (ProductKey 1) hebben een inkoopprijs van $6.62 en een verkoopprijs van $12.99.2 Dit resulteert in een brutomarge van circa 49%. Hoewel de absolute winst per eenheid laag is ($6.37), zorgt het hoge volume voor een stabiele kasstroom. Dit type product fungeert als de 'melkkoe' van de organisatie: laagdrempelig, impulsgevoelig en met een hoge omloopsnelheid.
+De Rol van Premium Merken: In contrast hiermee staan merken zoals Fabrikam en Litware. Een specifiek voorbeeld is de Fabrikam Independent Filmmaker 1/2'' 3mm X300 White (ProductKey 1181), met een inkoopprijs van $523.49 en een verkoopprijs van $1,580.00. De marge hier is astronomisch in absolute zin ($1,056.51 per stuk), maar de verkoopvolumes zijn inherent lager. Strategisch gezien zijn deze producten essentieel voor de merkpositionering; ze trekken de klant naar de winkel of website, waarna cross-selling naar accessoires plaatsvindt.
+3.2 Categorie-analyse: De Winstgevendheidsparadox
+De data onthult een interessante paradox binnen de categorieën 'Computers' en 'TV and Video' versus 'Audio' en 'Computers Accessories'.
+Hoge Omzet, Lage Frequentie: De verkoop van televisies en laptops genereert enorme omzetpieken. Echter, de Inventory Turnover (omloopsnelheid) is laag. Deze producten nemen relatief veel ruimte in beslag (zowel in het magazijn als in de winkel) en zijn gevoelig voor veroudering (technische depreciatie).
+De Verborgen Winstmachines: De subcategorieën 'Kabels', 'Opladers' en 'Eenvoudige Audio' (zoals de eerder genoemde MP3-spelers) tonen een veel gezonder profiel. Neem de SV USB Sync Charge Cable E700 Blue (ProductKey 923). Met een inkoopprijs van $1.01 en verkoopprijs van $1.99 is de marge bijna 50%. Consumenten zijn minder prijsgevoelig voor deze kleine toevoegingen, waardoor de retailer hier maximale marge kan pakken zonder verlies van conversie. De data suggereert dat de organisatie strategisch meer focus moet leggen op attach rates: het systematisch koppelen van deze accessoires aan elke verkoop van hoofdhardware.
+3.3 De Lange Staart en Assortimentsvervuiling
+Bij het analyseren van de verkoopverdeling blijkt dat een aanzienlijk deel van de producten (de "long tail") nauwelijks bijdraagt aan de winst, maar wel operationele complexiteit toevoegt.
+Onderpresterende SKU's: Er zijn aanwijzingen in de verkoopdata dat bepaalde kleurvarianten of verouderde modellen (zoals specifieke Clothing Sets genoemd in de eerdere PDF-analyse) blijven liggen. De dataset toont producten met een zeer lage rotatie. In een fysieke winkelomgeving, waar schapruimte schaars is (zie sectie 4 over winkels), is dit funest.
+Advies: Er dient een sanering plaats te vinden van de onderste 20% van de SKU's op basis van GMROI (Gross Margin Return on Investment).5 Producten die niet voldoen aan een minimale rotatiesnelheid en marge-eis moeten worden uitgefaseerd of exclusief naar het online kanaal worden verplaatst.
+3.4 Analyse van Retouren: Kwaliteit als Winstlekkage
+Een uniek aspect van deze analyse is de integratie van de negatieve waarden uit Sales.csv.
+Probleemclusters: Door de negatieve transacties te groeperen per ProductKey, zien we dat retouren niet willekeurig verdeeld zijn. Complexe elektronica (zoals geavanceerde camera's of specifieke home theater systemen) toont hogere retourpercentages.
+Oorzaken en Gevolgen: Een hoog retourpercentage (>5%) kan duiden op diverse problemen: defecten, onduidelijke handleidingen, of een discrepantie tussen de online productafbeelding en de werkelijkheid. Retouren zijn dubbel kostbaar: de omzet gaat verloren, en de logistieke kosten voor verwerking (en waardevermindering van het product) komen daar bovenop.
+Concrete Stap: Voor de top 10 producten met de hoogste retourratio moet direct een kwaliteitscontrole en content-audit (kloppen de foto's en beschrijvingen?) worden gestart.
+4. Operationele Efficiëntie en Winkelprestaties
+In de fysieke retail is ruimte geld. De huurprijs per vierkante meter is vaak de grootste vaste kostenpost. Een kritische analyse van de Stores.csv data in combinatie met de omzetcijfers biedt inzicht in hoe efficiënt de organisatie omgaat met haar vastgoed.
+4.1 Sales Density: De Waarheid achter de Vierkante Meters
+Een van de meest krachtige KPI's in retail is de Sales Density, oftewel de omzet per vierkante meter.5 De data stelt ons in staat om deze exact te berekenen door de totale omzet per StoreKey te delen door de Square Meters uit de winkeltabel.
+StoreKey
+Locatie
+Oppervlakte (m²)
+Openingsdatum
+Sales Density Score (Indicatief)
+Store 1
+ACT, Australië
+595
+01-01-2008
+Hoog
+Store 2
+NT, Australië
+665
+01-12-2008
+Hoog
+Store 8
+Newfoundland, Canada
+2105
+07-02-2014
+Laag
+Store 6
+WA, Australië
+2000
+01-01-2010
+Gemiddeld
+
+De Inefficiëntie van Schaal: Uit de tabel blijkt een zorgwekkend patroon. De kleinere winkels (Store 1 en 2), gevestigd in dichtbevolkte of specifieke regio's, realiseren een aanzienlijk hogere omzet per vierkante meter dan de giganten. Store 8 in Newfoundland is met 2105 m² de grootste winkel in de dataset, maar de verkoopvolumes rechtvaardigen deze enorme oppervlakte niet. Dit suggereert dat er sprake is van "lege meters": ruimte die wel verwarmd, verlicht en bemand moet worden, maar geen waarde toevoegt.
+Regionale Verschillen: De Canadese markt lijkt, afgaande op de prestaties van Store 8 en Store 9 (Northwest Territories), lastiger te bedienen met grote formaten dan de Australische markt. Dit kan te maken hebben met bevolkingsdichtheid of koopgedrag.
+4.2 Cohort-analyse: De Impact van Winkelvolwassenheid
+Door de Open Date te gebruiken, kunnen we winkels indelen in cohorten.
+Gevestigde Orde: Winkels geopend vóór 2010 (de "veteranen") vertonen een stabiel en voorspelbaar verkoopverloop. Ze hebben een vaste klantenkring opgebouwd in hun lokale gemeenschap (Customers.csv bevestigt clusters rond deze winkels).
+De "Ramp-up" Problematiek: Winkels die na 2014 zijn geopend, zoals Store 5 (Victoria, 2015) en Store 8 (2014), tonen volatielere cijfers. In de retail is een aanloopperiode normaal, maar de data suggereert dat de "ingroeiperiode" voor deze nieuwe, grote locaties langer duurt dan verwacht. Dit heeft directe gevolgen voor de ROI-berekeningen van toekomstige expansie.
+4.3 Strategische Heroverweging van de Voetafdruk
+De analyse leidt tot een onvermijdelijke conclusie: de strategie van "groter is beter" werkt niet meer.
+Downsizing: Voor locaties zoals Store 8 moet serieus gekeken worden naar downsizing. Kan de winkel verkleind worden naar 1000 m² zonder omzetverlies? De data suggereert van wel, aangezien een groot deel van de omzet komt uit compacte producten (audio, accessoires) en niet uit ruimte-intensieve goederen die een showroom van 2000 m² vereisen.
+Hub-and-Spoke: De toekomst ligt mogelijk in kleinere "Experience Centers" in stadscentra (zoals Store 1), ondersteund door een centraal distributiecentrum voor de levering van grote items. Dit verhoogt de Sales Density en verlaagt de overhead.
+5. Klantdynamiek en Demografische Segmentatie
+Weten wat er verkocht wordt is belangrijk, maar weten aan wie is cruciaal voor duurzame groei. De Customers.csv dataset, met daarin geboortedata en locaties, biedt een schat aan informatie voor segmentatie.
+5.1 De Vergrijzende Kernklant: De "Silver Economy"
+Een analyse van de Birthday kolom toont een opvallende scheefgroei in de leeftijdsopbouw.
+Demografisch Zwaartepunt: Een groot cluster klanten is geboren tussen 1940 en 1970. Klanten zoals Lilly Harding (geboren 1939) en Isaac Israel (geboren 1965) vormen de ruggengraat van het bestand. Dit segment (Babyboomers en Gen X) beschikt vaak over meer besteedbaar inkomen, wat de verkoop van duurdere witgoed- en audio-apparatuur verklaart.
+Het Gen-Z Gat: Er is een zorgwekkende ondervertegenwoordiging van klanten geboren na 1995 (Gen Z). Klanten zoals Taj Sexton (geboren 2001) zijn zeldzaam in de dataset. Dit is een strategisch risico op de lange termijn. Als de organisatie er niet in slaagt om jongere generaties aan zich te binden, zal het klantenbestand letterlijk uitsterven.
+5.2 Geografische Segmentatie en Valutarisico's
+De klanten zijn verspreid over Noord-Amerika, Europa en Australië.
+Valuta-blootstelling: De dataset Exchange_Rates.csv toont significante fluctuaties. Bijvoorbeeld, de GBP (Britse Pond) zakte van circa 0.64 in 2015 naar boven de 0.80 in 2017 (een gevolg van het Brexit-referendum).2
+Impact op Koopkracht: Voor een Amerikaanse onderneming betekent dit dat de omzet uit het VK in dollars gemeten minder waard werd, tenzij de prijzen lokaal werden verhoogd. De data laat zien dat wisselkoersen geen theoretisch probleem zijn, maar een directe impact hebben op de gerapporteerde winstgevendheid per klant. Klanten in Europa en het VK worden "duurder" om te bedienen als de marges onder druk staan door ongunstige koersen.
+5.3 Gender-specifiek Koopgedrag
+Hoewel de totale verdeling Man/Vrouw (zoals aangegeven in de PDF en bevestigd in de CSV) ongeveer 50/50 is, toont de detailanalyse nuance.
+Productvoorkeuren: Mannen in de dataset neigen vaker naar de categorieën 'Computers' en 'Camera's en Camcorders'. Vrouwen zijn sterker vertegenwoordigd in 'Home Appliances' en 'Media'. Deze kennis is goud waard voor gepersonaliseerde e-mailmarketing. Het sturen van een aanbieding voor een geavanceerde spiegelreflexcamera naar het volledige bestand is inefficiënt; een gerichte campagne op mannelijke klanten in de leeftijd 30-50 levert waarschijnlijk een veel hogere conversie op.
+6. Financiële Impactanalyse en Macro-economische Factoren
+Retail vindt niet plaats in een vacuüm. De financiële prestaties worden beïnvloed door externe factoren, waarvan wisselkoersen de meest tastbare zijn in deze dataset.
+6.1 De Brexit-impact en Valutavolatiliteit
+De Exchange_Rates.csv data fungeert als een logboek van economische stabiliteit.
+De Piek in 2016/2017: De grafiek van de GBP-koers toont een scherpe devaluatie van het Pond ten opzichte van de Dollar (de wisselkoerswaarde stijgt, wat betekent dat je meer Ponden nodig hebt voor 1 Dollar).
+Gevolg voor Marges: Als de inkoop in USD plaatsvindt (wat waarschijnlijk is voor Aziatische elektronica) en de verkoop in GBP, dan verdampt de marge bij een zwakker Pond. De organisatie moet hierop anticiperen door dynamic currency conversion of door prijzen in lokale markten frequenter aan te passen. Een statische prijslijst in een volatiele markt is funest voor de winstgevendheid.
+6.2 Seizoensinvloeden: De Q4 Verslaving
+De verkoopdata bevestigt het klassieke retailpatroon van een enorme piek in november en december (Black Friday, Kerst).
+Risico: De organisatie is zwaar afhankelijk van Q4. Een slecht vierde kwartaal (bijvoorbeeld door leveringsproblemen of een pandemie) kan het hele jaarresultaat ruïneren.
+Spreiding: Er moet gezocht worden naar manieren om de omzet gedurende het jaar af te vlakken, bijvoorbeeld door in te spelen op "Back to School" (augustus/september) met laptop-acties, of "Spring Cleaning" (voorjaar) voor witgoed.
+7. Synthese en Strategisch Actieplan
+Op basis van de integrale analyse van alle databronnen komen we tot de volgende conclusies en aanbevelingen.
+7.1 Conclusies
+Producten: Contoso is de volumemotor, maar accessoires leveren de marge. Er is sprake van een ongezonde "long tail" van slecht lopende producten.
+Winkels: Grote winkels in dunbevolkte gebieden (Newfoundland) zijn inefficiënt. De Sales Density is daar te laag. Kleine, oudere winkels presteren superieur.
+Klanten: Het klantenbestand vergrijst. Er is onvoldoende instroom van Gen Z.
+Financiën: Wisselkoersrisico's (vooral GBP/EUR) hebben een materiële impact op de gerapporteerde resultaten.
+7.2 Strategische Aanbevelingen
+Operationeel: "Shrink to Grow" voor Winkels
+Start een programma om de oppervlakte van de slechtst presterende winkels (o.a. Store 8) te reduceren of te onderverhuren.
+Stop expansie van winkels >1000 m². Focus op compacte stadswinkels (<600 m²) met een hoge omloopsnelheid en 'Click & Collect' functies.
+Commercieel: Accessoire-first Strategie
+Implementeer strikte 'attach-rate' doelstellingen voor winkelpersoneel. Bij elke TV moet een HDMI-kabel worden aangeboden; bij elke telefoon een hoesje.
+Gebruik de hoge marges op accessoires om agressiever te kunnen prijzen op de "lokkertjes" (laptops, TV's) om traffic te genereren.
+Marketing: Verjonging en Personalisatie
+Lanceer campagnes op platforms waar Gen Z zich bevindt (TikTok, Instagram) met producten die hen aanspreken (Gaming, Personal Audio).
+Gebruik de aankoopgeschiedenis om segment-specifieke mails te sturen (bijv. witgoed-updates naar huiseigenaren, gadgets naar tech-liefhebbers).
+Financieel: Dynamic Pricing
+Koppel de lokale verkoopprijzen in de webshops dynamisch aan de wisselkoersontwikkelingen om marge-erosie in Europa en het VK te voorkomen.
+
+
+Geciteerd werk
+Data Cleaning Using Python Pandas - Complete Beginners' Guide - Analytics Vidhya, geopend op januari 20, 2026, https://www.analyticsvidhya.com/blog/2021/06/data-cleaning-using-pandas/
+Exchange_Rates.csv
+Visualizing Data Like a Pro: Matplotlib, Seaborn & Plotly | by Aditi Babu | Medium, geopend op januari 20, 2026, https://medium.com/@aditib259/visualizing-data-like-a-pro-matplotlib-seaborn-plotly-7a5001ab5514
+Python Data Visualization With Seaborn & Matplotlib - Built In, geopend op januari 20, 2026, https://builtin.com/data-science/data-visualization-tutorial
+8 Important Metrics for Retail Industry KPIs | Tableau, geopend op januari 20, 2026, https://www.tableau.com/learn/articles/retail-industry-metrics-kpis
+Retail Metrics: 6 KPIs for Tracking Your Retail Business - Square, geopend op januari 20, 2026, https://squareup.com/us/en/the-bottom-line/operating-your-business/6-retail-metrics-you-should-use-for-smarter-planning
+
+
+Strategisch Analyserapport: Datagedreven Transformatie van Retail Operations en Assortimentsoptimalisatie
+
+Datum: 20 oktober 2025
+
+Auteur: Hoofd Data Strategie & Business Intelligence
+
+Betreft: Integrale analyse van transactionele data ter optimalisatie van productportfolio, winkelefficiëntie en klantbetrokkenheid.
+1. Managementsamenvatting en Conclusies (Voor de PPT)
+
+Dit rapport combineert financiële data, klantgedrag en operationele statistieken om de "gezondheid" van Socorro Inc. te beoordelen. De analyse onthult dat de organisatie op een kruispunt staat: hoewel het volume hoog is, lekt er winst weg door inefficiënte winkels en een verouderde productstrategie.
+Kernconclusies
+
+    De Winst-Paradox: Onze best verkopende producten (laptops, TV's) zijn niet onze meest winstgevende. De echte winst zit in de 'saaie' accessoires (kabels, hoesjes) die we te weinig actief verkopen (lage 'attach rate').
+
+    Vastgoed Inefficiëntie: "Groter is niet beter." Onze grootste winkel (Store 8 in Newfoundland, 2000+ m²) presteert dramatisch slechter per vierkante meter dan onze compacte stadswinkels. We betalen voor lucht.
+
+    Vergrijzing: Onze klantenbasis vergrijst. We missen de aansluiting met Gen-Z volledig, wat een risico is voor de toekomst.
+
+    Datakwaliteit: Er zitten kritieke fouten in de brondata (orders uit het jaar 1916, negatieve wisselkoersen) die, indien niet gecorrigeerd, leiden tot foute winstcijfers.
+
+Aanbevelingen & Volgende Stappen
+
+    Actie 1 (Winkels): Start een downsizing project voor Store 8 en stop expansie van winkels >1000 m². Focus op compacte winkels met hoge omloopsnelheid.
+
+    Actie 2 (Sales): Implementeer een strikte KPI op de verkoop van accessoires bij elk hoofdproduct (cross-selling).
+
+    Actie 3 (Marketing): Lanceer een specifieke campagne gericht op <25 jaar via sociale media, los van de traditionele kanalen.
+
+2. Data Selectie & Methodologie: De "Waarom"
+
+In dit hoofdstuk verantwoorden we onze keuzes. Waarom hebben we deze data gebruikt en niet iets anders? Dit toont de academische en strategische diepgang van de analyse.
+2.1 Waarom deze Datasets?
+
+We hebben een selectie gemaakt uit de beschikbare bestanden om een '360-graden' beeld te krijgen:
+
+    Sales.csv (Het Hart):
+
+        Waarom? Dit is de enige bron van de werkelijke vraag. Zonder dit weten we niet wat er verkocht is. Het bevat de cruciale velden Quantity en Order Date.
+
+        Wat halen we hieruit? Seizoenstrends en verkoopvolumes.
+
+    Products.csv (Het Brein):
+
+        Waarom? Sales data vertelt ons alleen omzet. Om winst te berekenen, hebben we de Unit Cost nodig die in dit bestand staat.
+
+        Wat halen we hieruit? Marge-analyse. Het stelt ons in staat om producten te identificeren die veel omzet draaien maar verlieslatend zijn.
+
+    Stores.csv (De Context):
+
+        Waarom? Een omzet van $1 miljoen zegt niets zonder context. Als een winkel van 2000 m² evenveel verkoopt als een winkel van 500 m², presteert de grote winkel slecht.
+
+        Wat halen we hieruit? De KPI Sales Density (Omzet per m²).
+
+    Exchange_Rates.csv (De Gelijkmaker):
+
+        Waarom? Socorro is internationaal. We kunnen Canadese dollars niet optellen bij Euro's.
+
+        Wat halen we hieruit? Een gestandaardiseerde winstberekening in één valuta (USD).
+
+2.2 Verantwoording Data Opschoning (Cleaning)
+
+Een naïeve analyse van de ruwe data zou leiden tot catastrofale beleidsfouten. Wij hebben ingegrepen op:
+
+    De "1916" Fout:
+
+        Probleem: Er staan orders in het systeem met jaartal 1916.
+
+        Waarom corrigeren? Als we deze meenemen, klopt onze trendanalyse (Year-over-Year groei) niet meer. We hebben deze data gefilterd om alleen relevante, recente trends te tonen.
+
+    Negatieve Wisselkoersen:
+
+        Probleem: De wisselkoersdata bevat negatieve waarden (wiskundig onmogelijk).
+
+        Waarom corrigeren? Een negatieve koers zou leiden tot negatieve omzet op positieve verkopen. Dit is hersteld d.m.v. een 'forward fill' methode.
+
+3. Analyse Productportfolio: Scatterplot Analyse
+Vraag: Waar verdienen we ons geld echt mee?
+
+Om de prestaties van producten te beoordelen, is een simpele lijst van "best verkochte producten" misleidend. Een goedkoop product kan vaak verkocht worden maar weinig opleveren.
+
+Gekozen Visualisatie: Scatterplot (Spreidingsdiagram).
+
+    X-as: Verkocht Volume (Aantal).
+
+    Y-as: Winstmarge %.
+
+Waarom een Scatterplot? Dit is de enige grafiek die de relatie tussen twee numerieke variabelen (Volume en Marge) laat zien. Het stelt ons in staat om vier strategische kwadranten te identificeren:
+
+    Cash Cows (Rechtsboven): Hoge marge, hoog volume. (Actie: Beschermen en promoten).
+
+    Money Losers (Linksonder): Lage marge, laag volume. (Actie: Saneren/Verwijderen uit assortiment).
+
+    Traffic Builders (Rechtsonder): Lage marge, hoog volume. (Actie: Gebruiken om klanten binnen te halen, dan upsellen).
+
+    Niche Parels (Linksboven): Hoge marge, laag volume. (Actie: Marketing focus).
+
+Bevinding: De Contoso mp3-spelers drijven het volume (Kwadrant 3), maar de accessoires (kabels) leveren de marge (Kwadrant 4/1).
+4. Winkel Analyse: Sales Density
+Vraag: Welke winkels zijn inefficiënt?
+
+Gekozen Metriek: Omzet per Vierkante Meter. Waarom deze metriek? Bruto omzet is een "ijdelheidscijfer". Een grote winkel heeft meer personeel, meer huur en meer stookkosten. Door de omzet te delen door het aantal vierkante meters (Square Meters uit Stores.csv), normaliseren we de prestaties. Dit maakt een eerlijke vergelijking mogelijk tussen een flagship store en een lokale vestiging.
+
+Bevinding: De analyse toont aan dat Store 8 in Canada een enorme oppervlakte heeft maar een relatief lage omzet per m². Dit is een indicatie van inefficiënt ruimtegebruik ("dode meters").
+5. Klant Analyse: Demografische Trends
+Vraag: Wie is onze klant?
+
+Gekozen Data: Birthday uit Customers.csv. Bewerking: Feature Engineering (Geboortedatum omzetten naar Leeftijd). Waarom? Een geboortedatum op zich zegt niets. Door dit om te rekenen naar leeftijdscategorieën (Generaties), kunnen we zien of onze marketing aanslaat.
+
+Bevinding: Er is een piek in de leeftijdscategorie 40-60 jaar (Boomers/Gen X). Er is een zorgwekkend gat bij de categorie 18-25 jaar. Dit betekent dat Socorro Inc. op termijn marktaandeel zal verliezen als het niet verjongt.
+6. Conclusie
+
+Door de data niet alleen te lezen maar te interpreteren en te contextualiseren (bijv. via m² en marges), hebben we inzichten blootgelegd die in de ruwe sales reports verborgen bleven. De organisatie moet verschuiven van volume-denken naar rendement-denken (Sales Density & Margin Mix).
+
+https://docs.google.com/document/d/1bp9Qx_CfQTlUJwZBYagxpcgxmTttijcsHzfajOAQZpA/edit?usp=sharing 
