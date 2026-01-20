@@ -4,212 +4,154 @@ import seaborn as sns
 import numpy as np
 
 # ==============================================================================
-# INSTELLINGEN & CONFIGURATIE
+# CONFIGURATIE & STIJL
 # ==============================================================================
 sns.set(style="whitegrid")
+sns.set_context("talk") # Zorgt voor professionele, leesbare letters
 plt.rcParams['figure.figsize'] = (14, 8)
-plt.rcParams['axes.titlesize'] = 16
-plt.rcParams['axes.labelsize'] = 12
 
-# ==============================================================================
-# FASE 1: DATA INLADEN EN SCHOONMAKEN (ETL)
-# ==============================================================================
-def load_and_clean_data():
-    """
-    Laadt de CSV bestanden en voert initiële schoonmaakacties uit.
-    """
-    print("--- FASE 1: Data Inladen en Opschonen ---")
+def run_full_audit():
+    print("--- 1. DATA LADEN & INTEGRITEITSCHECK... ---")
     try:
-        # 1. Laden van Dataframes
-        # ISO-8859-1 encoding is nodig voor speciale karakters in namen
+        # CSV's inlezen
         df_sales = pd.read_csv('Sales.csv')
         df_products = pd.read_csv('Products.csv')
         df_stores = pd.read_csv('Stores.csv')
         df_customers = pd.read_csv('Customers.csv', encoding='ISO-8859-1') 
-        df_exchange = pd.read_csv('Exchange_Rates.csv')
-
-        # 2. Datum Conversies (MET FIX VOOR 00/00/0000)
-        print("Converteren van datums naar datetime objecten...")
         
-        # errors='coerce' zorgt ervoor dat foute datums (zoals 00/00/0000) worden omgezet naar NaT (Not a Time)
-        # in plaats van het script te laten crashen.
+        # --- CRUCIALE STAP: KOLOMMEN HERNOEMEN OM MERGE FOUTEN TE VOORKOMEN ---
+        df_stores = df_stores.rename(columns={'State': 'StoreState', 'Country': 'StoreCountry'})
+        df_customers = df_customers.rename(columns={'State': 'CustomerState', 'Country': 'CustomerCountry'})
+
+        # --- DATA CLEANING (ETL) ---
+        # 1. Datum fix (1916 fout eruit)
         df_sales['Order Date'] = pd.to_datetime(df_sales['Order Date'], errors='coerce')
-        df_stores['Open Date'] = pd.to_datetime(df_stores['Open Date'], errors='coerce')
-        df_customers['Birthday'] = pd.to_datetime(df_customers['Birthday'], errors='coerce')
-        df_exchange['Date'] = pd.to_datetime(df_exchange['Date'], errors='coerce')
+        df_sales = df_sales[df_sales['Order Date'].dt.year >= 2000].dropna(subset=['Order Date'])
 
-        # Verwijder rijen waar de datum nu ongeldig (NaT) is geworden in Sales
-        # Want een verkoop zonder datum kunnen we niet analyseren.
-        initial_sales_count = len(df_sales)
-        df_sales = df_sales.dropna(subset=['Order Date'])
-        if len(df_sales) < initial_sales_count:
-            print(f" -> {initial_sales_count - len(df_sales)} rijen met ongeldige datums (bv. 00/00/0000) verwijderd.")
+        # 2. Prijzen fix ($ en , verwijderen)
+        for col in ['Unit Cost USD', 'Unit Price USD']:
+            if df_products[col].dtype == 'object':
+                df_products[col] = df_products[col].astype(str).replace({r'\$': '', ',': ''}, regex=True)
+                df_products[col] = pd.to_numeric(df_products[col], errors='coerce')
 
-        # 3. Opschonen Exchange Rates
-        df_exchange = df_exchange.dropna(subset=['Date']) # Verwijder ongeldige datums in wisselkoersen
-        df_exchange = df_exchange.sort_values(by='Date')
-        df_exchange = df_exchange.ffill()
+        # 3. Mergen (Samenvoegen tot één dataset)
+        df = df_sales.merge(df_products, on='ProductKey', how='left')
+        df = df.merge(df_stores, on='StoreKey', how='left')
+        df = df.merge(df_customers, on='CustomerKey', how='left')
+
+        # --- KPI BEREKENINGEN ---
+        df['Total Revenue'] = df['Quantity'] * df['Unit Price USD']
+        df['Total Cost'] = df['Quantity'] * df['Unit Cost USD']
+        df['Total Profit'] = df['Total Revenue'] - df['Total Cost']
         
-        # 4. Filteren van de '1916' datums in Sales (Data Cleaning)
-        initial_count = len(df_sales)
-        df_sales = df_sales[df_sales['Order Date'].dt.year >= 2000]
-        print(f" -> {initial_count - len(df_sales)} records met foutieve historische jaartallen (voor 2000) verwijderd.")
+        # Leeftijd berekenen
+        df['Age'] = (pd.Timestamp('now') - pd.to_datetime(df['Birthday'], errors='coerce')).dt.days // 365
 
-        return df_sales, df_products, df_stores, df_customers, df_exchange
+        # ==============================================================================
+        # BEWIJSVOERING VOOR SLIDE 2 (TERMINAL OUTPUT)
+        # ==============================================================================
+        total_rev = df['Total Revenue'].sum()
+        total_profit = df['Total Profit'].sum()
+        avg_margin = (total_profit / total_rev) * 100
 
-    except FileNotFoundError as e:
-        print(f"KRITIEKE FOUT: Bestand niet gevonden: {e}")
-        return None, None, None, None, None
+        print("\n" + "="*50)
+        print("     SOCORRO INC. - AUDIT RAPPORT (2025)")
+        print("="*50)
+        print(f"BEWIJS VOOR SLIDE 2:")
+        print(f" -> Totale Omzet:      ${total_rev:,.2f}")
+        print(f" -> Totale Winst:      ${total_profit:,.2f}")
+        print(f" -> Bruto Marge:       {avg_margin:.2f}%")
+        print(f" -> Aantal Orders:     {len(df):,}")
+        print("="*50 + "\n")
 
-# ==============================================================================
-# FASE 2: DATA INTEGRATIE EN VERRIJKING
-# ==============================================================================
-def perform_strategic_analysis(df_sales, df_products, df_stores, df_customers, df_exchange):
-    """
-    Voert de kernanalyses uit: Merging, Valuta-conversie, KPI berekening.
-    """
-    print("\n--- FASE 2: Data Integratie en Verrijking ---")
+        # ==============================================================================
+        # DE GRAFIEKEN GENEREREN
+        # ==============================================================================
+        print("--- 2. GRAFIEKEN GENEREREN... ---")
 
-    # --- STAP 1: Data Cleaning van Prijzen ---
-    # FIX: We gebruiken r'\$' (raw string) om de SyntaxWarning te voorkomen
-    cols_to_clean = ['Unit Cost USD', 'Unit Price USD']
-    for col in cols_to_clean:
-        if df_products[col].dtype == 'object':
-            # Eerst naar string omzetten voor de zekerheid, dan vervangen
-            df_products[col] = df_products[col].astype(str).replace({r'\$': '', ',': ''}, regex=True)
-            # Dan naar numeriek, errors='coerce' maakt van niet-getallen NaN
-            df_products[col] = pd.to_numeric(df_products[col], errors='coerce')
-
-    # --- STAP 2: Data Verrijking (Left Joins) ---
-    df_full = pd.merge(df_sales, df_products, on='ProductKey', how='left')
-    df_full = pd.merge(df_full, df_stores, on='StoreKey', how='left')
-    df_full = pd.merge(df_full, df_customers, on='CustomerKey', how='left')
-
-    # --- STAP 3: Valuta Normalisatie ---
-    df_exchange_renamed = df_exchange.rename(columns={'Date': 'Order Date', 'Currency': 'Currency Code', 'Exchange': 'ExchangeRate'})
-    
-    # Merge Sales met Exchange rates op Datum EN Valuta
-    df_full = pd.merge(df_full, df_exchange_renamed, on=['Order Date', 'Currency Code'], how='left')
-    
-    # Vul ontbrekende wisselkoersen (vaak USD of missende data) met 1.0
-    df_full['ExchangeRate'] = df_full['ExchangeRate'].fillna(1.0)
-
-    # --- STAP 4: Berekeningen (KPI's) ---
-    df_full['Total Revenue USD'] = df_full['Quantity'] * df_full['Unit Price USD']
-    df_full['Total Cost USD'] = df_full['Quantity'] * df_full['Unit Cost USD']
-    df_full['Total Profit USD'] = df_full['Total Revenue USD'] - df_full['Total Cost USD']
-    
-    # Marge %
-    df_full['Profit Margin %'] = np.where(
-        df_full['Total Revenue USD'] != 0, 
-        (df_full['Total Profit USD'] / df_full['Total Revenue USD']) * 100, 
-        0
-    )
-
-    return df_full
-
-# ==============================================================================
-# FASE 3: STRATEGISCHE VISUALISATIES
-# ==============================================================================
-def generate_visualizations(df_full):
-    print("\n--- FASE 3: Strategische Inzichten Genereren ---")
-    
-    # ---------------------------------------------------------
-    # ANALYSE 1: PRODUCT MATRIX (Volume vs Marge)
-    # ---------------------------------------------------------
-    try:
-        cat_stats = df_full.groupby('Category').agg({
-            'Total Revenue USD': 'sum',
-            'Total Profit USD': 'sum',
-            'Quantity': 'sum'
-        }).sort_values(by='Total Revenue USD', ascending=False).reset_index()
-        
-        cat_stats['Margin %'] = (cat_stats['Total Profit USD'] / cat_stats['Total Revenue USD']) * 100
-        
-        print("\nPrestaties per Categorie (Top 5):")
-        print(cat_stats.head(5))
-
-        # Visualisatie: Bar + Line Chart
-        fig, ax1 = plt.subplots(figsize=(12, 6))
-        sns.barplot(data=cat_stats, x='Category', y='Total Revenue USD', color='skyblue', ax=ax1)
-        ax1.set_ylabel('Totale Omzet (USD)', color='blue')
-        
-        ax2 = ax1.twinx()
-        sns.lineplot(data=cat_stats, x='Category', y='Margin %', color='red', marker='o', ax=ax2, linewidth=3)
-        ax2.set_ylabel('Marge %', color='red')
-        
-        plt.title('Strategische Paradox: Omzet vs. Winstmarge per Categorie')
-        plt.grid(False)
-        plt.show()
-    except Exception as e:
-        print(f"Kon grafiek 1 niet maken: {e}")
-
-    # ---------------------------------------------------------
-    # ANALYSE 2: WINKEL EFFICIËNTIE (Sales Density)
-    # ---------------------------------------------------------
-    try:
-        physical_stores = df_full[(df_full['StoreKey'] != 0) & (df_full['Square Meters'].notna()) & (df_full['Square Meters'] > 0)]
-        
-        store_kpis = physical_stores.groupby(['StoreKey', 'State', 'Country', 'Square Meters']).agg({
-            'Total Revenue USD': 'sum'
-        }).reset_index()
-        
-        store_kpis['SalesPerSqMeter'] = store_kpis['Total Revenue USD'] / store_kpis['Square Meters']
-        
-        print("\nTop 5 Meest Efficiënte Winkels (Sales Density):")
-        print(store_kpis.sort_values(by='SalesPerSqMeter', ascending=False).head(5))
-
-        # Visualisatie: Scatter Plot
-        plt.figure(figsize=(12, 8))
-        sns.scatterplot(
-            data=store_kpis, 
-            x='Square Meters', 
-            y='SalesPerSqMeter', 
-            hue='Country', 
-            size='Total Revenue USD', 
-            sizes=(50, 500),
-            palette='viridis'
-        )
-        plt.title('Winkelefficiëntie Matrix: Oppervlakte vs. Verkoopdichtheid')
-        plt.xlabel('Winkeloppervlakte (m²)')
-        plt.ylabel('Omzet per m² (USD)')
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        # --- GRAFIEK 1: SALES TREND (VOOR SLIDE 3) ---
+        monthly_sales = df.set_index('Order Date').resample('M')['Total Revenue'].sum().reset_index()
+        plt.figure(figsize=(14, 6))
+        sns.lineplot(data=monthly_sales, x='Order Date', y='Total Revenue', color='navy', linewidth=3)
+        plt.title('Sales Trend (2016-2021): Seizoensgebonden Groei', fontweight='bold')
+        plt.ylabel('Omzet (USD)')
         plt.tight_layout()
         plt.show()
-    except Exception as e:
-        print(f"Kon grafiek 2 niet maken: {e}")
 
-    # ---------------------------------------------------------
-    # ANALYSE 3: KLANT GENERATIES (Leeftijd)
-    # ---------------------------------------------------------
-    try:
-        now = pd.Timestamp('now')
-        df_full['Age'] = (now - df_full['Birthday']).dt.days // 365
-        
-        df_clean_age = df_full[(df_full['Age'] > 10) & (df_full['Age'] < 100)].copy()
+        # --- GRAFIEK 2: DE MATRIX PER CATEGORIE (VOOR SLIDE 4/5) ---
+        cat_stats = df.groupby('Category').agg({
+            'Total Revenue': 'sum', 'Total Profit': 'sum', 'Quantity': 'sum'
+        }).reset_index()
+        cat_stats['Margin %'] = (cat_stats['Total Profit'] / cat_stats['Total Revenue']) * 100
 
-        bins = [10, 25, 40, 55, 70, 100]
-        labels = ['Gen Z (10-25)', 'Millennials (26-40)', 'Gen X (41-55)', 'Boomers (56-70)', 'Silent (70+)']
-        df_clean_age['AgeGroup'] = pd.cut(df_clean_age['Age'], bins=bins, labels=labels)
-        
-        age_revenue = df_clean_age.groupby('AgeGroup', observed=False)['Total Revenue USD'].sum().reset_index()
-
-        # Visualisatie: Bar Chart
-        plt.figure(figsize=(10, 6))
-        sns.barplot(data=age_revenue, x='AgeGroup', y='Total Revenue USD', palette='pastel')
-        plt.title('Omzetbijdrage per Generatie')
-        plt.ylabel('Totale Omzet (USD)')
-        plt.xlabel('Generatie')
+        plt.figure(figsize=(14, 9))
+        sns.scatterplot(
+            data=cat_stats, x='Total Revenue', y='Margin %', size='Total Profit', 
+            sizes=(1000, 5000), hue='Category', alpha=0.7, legend=False
+        )
+        for i in range(cat_stats.shape[0]):
+            plt.text(cat_stats['Total Revenue'][i], cat_stats['Margin %'][i], cat_stats['Category'][i], 
+                     horizontalalignment='center', size='small', color='black', weight='bold')
+        plt.axvline(cat_stats['Total Revenue'].mean(), color='red', linestyle='--', alpha=0.3)
+        plt.axhline(cat_stats['Margin %'].mean(), color='red', linestyle='--', alpha=0.3)
+        plt.title('STRATEGISCHE MATRIX: Categorie Analyse', fontweight='bold')
+        plt.xlabel('Totale Omzet (Volume)')
+        plt.ylabel('Winstmarge (%)')
+        plt.tight_layout()
         plt.show()
-    except Exception as e:
-        print(f"Kon grafiek 3 niet maken: {e}")
 
-# --- HOOFDPROGRAMMA ---
+        # --- GRAFIEK 3: TOP 5 CASH COWS (VOOR SLIDE 5) ---
+        prod_stats = df.groupby('Product Name').agg({'Total Profit': 'sum', 'Total Revenue': 'sum'}).reset_index()
+        top_5 = prod_stats.sort_values('Total Profit', ascending=False).head(5)
+        top_5['ShortName'] = top_5['Product Name'].str[:40] + '...'
+        
+        plt.figure(figsize=(12, 6))
+        sns.barplot(data=top_5, y='ShortName', x='Total Profit', palette='Greens_r')
+        plt.title('TOP 5 WINNAARS (Hoogste Absolute Winst)', fontweight='bold')
+        plt.xlabel('Winst (USD)')
+        plt.tight_layout()
+        plt.show()
+
+        # --- GRAFIEK 4: FLOP 5 BLEEDERS (VOOR SLIDE 6) ---
+        # We voegen Marge toe aan prod_stats en filteren op volume
+        prod_stats_full = df.groupby(['Product Name']).agg({'Total Profit': 'sum', 'Total Revenue': 'sum', 'Quantity': 'sum'}).reset_index()
+        prod_stats_full['Margin %'] = (prod_stats_full['Total Profit'] / prod_stats_full['Total Revenue']) * 100
+        flop_5 = prod_stats_full[prod_stats_full['Quantity'] > 100].sort_values('Margin %', ascending=True).head(5)
+        flop_5['ShortName'] = flop_5['Product Name'].str[:40] + '...'
+
+        plt.figure(figsize=(12, 6))
+        sns.barplot(data=flop_5, y='ShortName', x='Margin %', palette='Reds_r')
+        plt.title('TOP 5 VERLIEZERS (Laagste Marge bij Hoog Volume)', fontweight='bold')
+        plt.xlabel('Marge %')
+        plt.axvline(x=50, color='red', linestyle='--', label='Target')
+        plt.tight_layout()
+        plt.show()
+
+        # --- GRAFIEK 5: VASTGOED BEWIJS (VOOR SLIDE 7/8) ---
+        stores = df[(df['StoreKey'] != 0) & (df['Square Meters'] > 0)]
+        store_kpi = stores.groupby(['StoreCountry', 'Square Meters'])['Total Revenue'].sum().reset_index()
+        store_kpi['Revenue_Per_SqM'] = store_kpi['Total Revenue'] / store_kpi['Square Meters']
+
+        plt.figure(figsize=(14, 8))
+        sns.scatterplot(data=store_kpi, x='Square Meters', y='Revenue_Per_SqM', hue='StoreCountry', s=300, palette='viridis')
+        sns.regplot(data=store_kpi, x='Square Meters', y='Revenue_Per_SqM', scatter=False, color='red', line_kws={'linestyle':'--'})
+        plt.title('VASTGOED ANALYSE: "Shrink to Grow" Bewijs', fontweight='bold')
+        plt.xlabel('Winkelgrootte (m²)')
+        plt.ylabel('Efficiëntie ($/m²)')
+        plt.tight_layout()
+        plt.show()
+
+        # --- GRAFIEK 6: KLANT LEEFTIJD (VOOR SLIDE 8/9) ---
+        df_age = df[(df['Age'] > 10) & (df['Age'] < 90)]
+        plt.figure(figsize=(12, 6))
+        sns.histplot(data=df_age, x='Age', bins=20, kde=True, color='purple')
+        plt.title('KLANTPROFIEL: Leeftijdsverdeling', fontweight='bold')
+        plt.xlabel('Leeftijd')
+        plt.tight_layout()
+        plt.show()
+
+    except Exception as e:
+        print(f"Er ging iets mis: {e}")
+
 if __name__ == "__main__":
-    df_sales, df_products, df_stores, df_customers, df_exchange = load_and_clean_data()
-    
-    if df_sales is not None:
-        print("Data succesvol geladen. Start analyse...")
-        df_final = perform_strategic_analysis(df_sales, df_products, df_stores, df_customers, df_exchange)
-        generate_visualizations(df_final)
-        print("Analyse voltooid.")
+    run_full_audit()
